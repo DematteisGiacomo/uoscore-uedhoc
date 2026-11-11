@@ -297,13 +297,15 @@ decrypt_wrapper(struct byte_array *ciphertext, struct byte_array *plaintext,
 	TRY(create_aad(NULL, 0, c->cc.aead_alg, &request_kid, &request_piv,
 		       &aad));
 
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	oscore_key_t recipient_key = c->rc.recipient_key_id;
+#else
+	oscore_key_t recipient_key = &c->rc.recipient_key;
+#endif
+
 	/* Decrypt the ciphertext */
 	TRY(oscore_cose_decrypt(ciphertext, plaintext, &nonce, &aad,
-#ifdef MBEDTLS
-				c->rc.recipient_key_id));
-#else
-				&c->rc.recipient_key));
-#endif
+				recipient_key));
 
 	/* Update nonce only after successful decryption (for handling future responses) */
 	if (NULL != new_nonce_oscore_option) {

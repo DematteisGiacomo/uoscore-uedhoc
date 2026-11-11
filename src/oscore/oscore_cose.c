@@ -74,7 +74,7 @@ enum err oscore_cose_decrypt(struct byte_array *in_ciphertext,
 
 	PRINT_ARRAY("Ciphertext", in_ciphertext->ptr, in_ciphertext->len);
 
-#ifdef MBEDTLS
+#ifdef OSCORE_PSA_OPAQUE_KEYS
 	TRY(aead_with_key_id(DECRYPT, in_ciphertext, key, nonce, &aad,
 			     out_plaintext, &tag));
 #else
@@ -104,7 +104,7 @@ enum err oscore_cose_encrypt(struct byte_array *in_plaintext,
 		BYTE_ARRAY_INIT(out_ciphertext->ptr + in_plaintext->len, 8);
 
 	out_ciphertext->len -= tag.len;
-#ifdef MBEDTLS
+#ifdef OSCORE_PSA_OPAQUE_KEYS
 	TRY(aead_with_key_id(ENCRYPT, in_plaintext, key, nonce, &aad,
 			     out_ciphertext, &tag));
 #else

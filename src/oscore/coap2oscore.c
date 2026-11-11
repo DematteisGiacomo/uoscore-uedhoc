@@ -553,13 +553,15 @@ static enum err encrypt_wrapper(struct byte_array *plaintext,
 	TRY(create_aad(NULL, 0, c->cc.aead_alg, &request_kid, &request_piv,
 		       &aad));
 
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	oscore_key_t sender_key = c->sc.sender_key_id;
+#else
+	oscore_key_t sender_key = &c->sc.sender_key;
+#endif
+
 	/* Encrypt the plaintext */
 	TRY(oscore_cose_encrypt(plaintext, ciphertext, &nonce, &aad,
-#ifdef MBEDTLS
-				c->sc.sender_key_id));
-#else
-				&c->sc.sender_key));
-#endif
+				sender_key));
 
 	/* Update nonce only after successful encryption (for handling future responses). */
 	if (use_new_piv) {

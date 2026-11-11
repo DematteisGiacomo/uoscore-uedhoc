@@ -29,7 +29,7 @@
 #include "common/print_util.h"
 #include "common/unit_test.h"
 
-#ifdef MBEDTLS
+#ifdef OSCORE_PSA_OPAQUE_KEYS
 /* AEAD algorithm the derived Sender/Recipient keys may be used with. */
 #define OSCORE_PSA_AEAD_ALG                                                    \
 	PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, AUTH_TAG_LEN)
@@ -105,7 +105,7 @@ static enum err derive_recipient_key(struct common_context *cc,
 				   OSCORE_PSA_AEAD_ALG, &rc->recipient_key_id));
 	return ok;
 }
-#else /* !MBEDTLS */
+#else /* !OSCORE_PSA_OPAQUE_KEYS */
 /**
  * @brief       Common derive procedure used to derive the Common IV and
  *              Sender / Recipient Keys
@@ -177,7 +177,66 @@ static enum err derive_recipient_key(struct common_context *cc,
 		    rc->recipient_key.len);
 	return ok;
 }
-#endif /* MBEDTLS */
+#endif /* OSCORE_PSA_OPAQUE_KEYS */
+
+static enum err derive_contexts(struct oscore_init_params *params,
+				struct context *c)
+{
+	c->cc.common_iv.len = sizeof(c->cc.common_iv_buf);
+	c->cc.common_iv.ptr = c->cc.common_iv_buf;
+	TRY(derive_common_iv(&c->cc));
+
+	/*derive Recipient Context*********************************************/
+	c->rc.notification_num_initialized = false;
+	server_replay_window_init(&c->rc.replay_window);
+	c->rc.recipient_id.len = params->recipient_id.len;
+	c->rc.recipient_id.ptr = c->rc.recipient_id_buf;
+	memcpy(c->rc.recipient_id.ptr, params->recipient_id.ptr,
+	       params->recipient_id.len);
+#ifndef OSCORE_PSA_OPAQUE_KEYS
+	c->rc.recipient_key.len = sizeof(c->rc.recipient_key_buf);
+	c->rc.recipient_key.ptr = c->rc.recipient_key_buf;
+#endif
+	TRY(derive_recipient_key(&c->cc, &c->rc));
+
+	/*derive Sender Context************************************************/
+	c->sc.sender_id = params->sender_id;
+#ifndef OSCORE_PSA_OPAQUE_KEYS
+	c->sc.sender_key.len = sizeof(c->sc.sender_key_buf);
+	c->sc.sender_key.ptr = c->sc.sender_key_buf;
+#endif
+	struct nvm_key_t nvm_key = { .sender_id = c->sc.sender_id,
+				     .recipient_id = c->rc.recipient_id,
+				     .id_context = c->cc.id_context };
+
+	TRY(ssn_init(&nvm_key, &c->sc.ssn, params->fresh_master_secret_salt));
+	TRY(derive_sender_key(&c->cc, &c->sc));
+
+	return ok;
+}
+
+enum err oscore_context_deinit(struct context *c)
+{
+	if (NULL == c) {
+		return wrong_parameter;
+	}
+
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	if (PSA_KEY_ID_NULL != c->sc.sender_key_id) {
+		psa_destroy_key(c->sc.sender_key_id);
+		c->sc.sender_key_id = PSA_KEY_ID_NULL;
+	}
+	if (PSA_KEY_ID_NULL != c->rc.recipient_key_id) {
+		psa_destroy_key(c->rc.recipient_key_id);
+		c->rc.recipient_key_id = PSA_KEY_ID_NULL;
+	}
+	c->cc.master_secret_id = PSA_KEY_ID_NULL;
+#else
+	memset(c->sc.sender_key_buf, 0, sizeof(c->sc.sender_key_buf));
+	memset(c->rc.recipient_key_buf, 0, sizeof(c->rc.recipient_key_buf));
+#endif
+	return ok;
+}
 
 enum err oscore_context_init(struct oscore_init_params *params,
 			     struct context *c)
@@ -201,7 +260,7 @@ enum err oscore_context_init(struct oscore_init_params *params,
 	c->cc.master_salt = params->master_salt;
 	c->cc.id_context = params->id_context;
 
-#ifdef MBEDTLS
+#ifdef OSCORE_PSA_OPAQUE_KEYS
 	/* Resolve the master secret to a PSA derive key. If the caller supplied
 	   an opaque handle, use it (the app owns its lifetime). Otherwise import
 	   the raw bytes into a temporary volatile derive key, used only for the
@@ -225,48 +284,20 @@ enum err oscore_context_init(struct oscore_init_params *params,
 		owns_master_key = true;
 	}
 	c->cc.master_secret_id = master_secret_id;
-#else
-	c->cc.master_secret = params->master_secret;
-#endif
 
-	c->cc.common_iv.len = sizeof(c->cc.common_iv_buf);
-	c->cc.common_iv.ptr = c->cc.common_iv_buf;
-	TRY(derive_common_iv(&c->cc));
+	enum err r = derive_contexts(params, c);
 
-	/*derive Recipient Context*********************************************/
-	c->rc.notification_num_initialized = false;
-	server_replay_window_init(&c->rc.replay_window);
-	c->rc.recipient_id.len = params->recipient_id.len;
-	c->rc.recipient_id.ptr = c->rc.recipient_id_buf;
-	memcpy(c->rc.recipient_id.ptr, params->recipient_id.ptr,
-	       params->recipient_id.len);
-#ifndef MBEDTLS
-	c->rc.recipient_key.len = sizeof(c->rc.recipient_key_buf);
-	c->rc.recipient_key.ptr = c->rc.recipient_key_buf;
-#endif
-	TRY(derive_recipient_key(&c->cc, &c->rc));
-
-	/*derive Sender Context************************************************/
-	c->sc.sender_id = params->sender_id;
-#ifndef MBEDTLS
-	c->sc.sender_key.len = sizeof(c->sc.sender_key_buf);
-	c->sc.sender_key.ptr = c->sc.sender_key_buf;
-#endif
-	struct nvm_key_t nvm_key = { .sender_id = c->sc.sender_id,
-				     .recipient_id = c->rc.recipient_id,
-				     .id_context = c->cc.id_context };
-
-	TRY(ssn_init(&nvm_key, &c->sc.ssn, params->fresh_master_secret_salt));
-	TRY(derive_sender_key(&c->cc, &c->sc));
-
-#ifdef MBEDTLS
-	/* The temporary master-secret key (if we created one) has served all
-	   derivations; destroy it so no derive key lingers. App-owned opaque
-	   keys are left untouched. */
 	if (owns_master_key) {
 		psa_destroy_key(master_secret_id);
 		c->cc.master_secret_id = PSA_KEY_ID_NULL;
 	}
+	if (ok != r) {
+		oscore_context_deinit(c);
+		return r;
+	}
+#else
+	c->cc.master_secret = params->master_secret;
+	TRY(derive_contexts(params, c));
 #endif
 
 	/*set up the request response context**********************************/

@@ -109,6 +109,8 @@ struct oscore_init_params {
 enum err oscore_context_init(struct oscore_init_params *params,
 			     struct context *c);
 
+enum err oscore_context_deinit(struct context *c);
+
 /**
  * @brief  	Checks if the packet in buf_in is a OSCORE packet.
  * 		If so it converts it to a CoAP packet and sets the oscore_pkg to
