@@ -118,6 +118,52 @@ enum err shared_secret_derive(enum ecdh_alg alg, const struct byte_array *sk,
 			      uint8_t *shared_secret);
 
 /**
+ * @brief			Derives ECDH shared secret from a raw private
+ *				key or, when sk_id is not 0, from a resident
+ *				PSA key (MBEDTLS builds only).
+ *
+ * @param alg			The ECDH algorithm to be used.
+ * @param[in] sk 		Private key, ignored when sk_id is not 0.
+ * @param sk_id 		PSA key id of the private key or 0.
+ * @param[in] pk 		Public key.
+ * @param[out] shared_secret 	The result.
+ * @return 			Ok or error code.
+ */
+enum err shared_secret_derive_key(enum ecdh_alg alg,
+				  const struct byte_array *sk, uint32_t sk_id,
+				  const struct byte_array *pk,
+				  uint8_t *shared_secret);
+
+#ifdef MBEDTLS
+/**
+ * @brief			Derives ECDH shared secret with a resident PSA
+ *				key. The key is neither imported nor destroyed.
+ *
+ * @param alg			The ECDH algorithm to be used (P256 only).
+ * @param sk_id 		PSA key id of the private key.
+ * @param[in] pk 		Public key (x coordinate).
+ * @param[out] shared_secret 	The result.
+ * @return 			Ok or error code.
+ */
+enum err shared_secret_derive_psa(enum ecdh_alg alg, psa_key_id_t sk_id,
+				  const struct byte_array *pk,
+				  uint8_t *shared_secret);
+
+/**
+ * @brief			Generates a volatile, non-exportable ephemeral
+ *				ECDH key pair in PSA. The caller destroys the
+ *				key with psa_destroy_key() when done.
+ *
+ * @param alg			The ECDH algorithm to be used (P256 only).
+ * @param[out] sk_id 		PSA key id of the private key.
+ * @param[out] pk 		Public key (x coordinate).
+ * @return 			Ok or error code.
+ */
+enum err ephemeral_dh_key_gen_psa(enum ecdh_alg alg, psa_key_id_t *sk_id,
+				  struct byte_array *pk);
+#endif /* MBEDTLS */
+
+/**
  * @brief			HKDF extract function, see rfc5869.
  * 
  * @param alg			Hash algorithm to be used.

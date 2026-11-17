@@ -56,6 +56,8 @@ struct edhoc_responder_context {
 	struct byte_array cred_r;
 	struct byte_array sk_r; /*sign key -use with method 0 and 2*/
 	struct byte_array pk_r; /*coresp. pk to sk_r -use with method 0 and 2*/
+	uint32_t y_key_id; /*PSA key id used instead of y when not 0*/
+	uint32_t r_key_id; /*PSA key id used instead of r when not 0*/
 	void *sock; /*pointer used as handler for sockets by tx/rx */
 	void *params_ead_process; /*parameters for processing EAD1 and EAD3 */
 };
@@ -74,6 +76,8 @@ struct edhoc_initiator_context {
 	struct byte_array i; /* static DH sk -> use only with method 2 or 3*/
 	struct byte_array sk_i; /*sign key use with method 0 and 2*/
 	struct byte_array pk_i; /*coresp. pk to sk_r -use with method 0 and 2*/
+	uint32_t x_key_id; /*PSA key id used instead of x when not 0*/
+	uint32_t i_key_id; /*PSA key id used instead of i when not 0*/
 	void *sock; /*pointer used as handler for sockets by tx/rx */
 	void *params_ead_process; /*parameters for processing EAD2 and EAD4 */
 };

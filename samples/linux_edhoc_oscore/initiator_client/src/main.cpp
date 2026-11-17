@@ -162,6 +162,8 @@ int main()
 	TRY_EXPECT(start_coap_client(&sockfd), 0);
 
 	c_i.sock = &sockfd;
+	c_i.x_key_id = 0;
+	c_i.i_key_id = 0;
 	c_i.c_i.len = test_vectors[vec_num_i].c_i_len;
 	c_i.c_i.ptr = (uint8_t *)test_vectors[vec_num_i].c_i;
 	c_i.method = (enum method_type) * test_vectors[vec_num_i].method;

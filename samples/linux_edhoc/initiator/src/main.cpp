@@ -158,6 +158,8 @@ int main()
 	uint8_t vec_num_i = TEST_VEC_NUM - 1;
 
 	c_i.sock = &sockfd;
+	c_i.x_key_id = 0;
+	c_i.i_key_id = 0;
 	c_i.c_i.len = test_vectors[vec_num_i].c_i_len;
 	c_i.c_i.ptr = (uint8_t *)test_vectors[vec_num_i].c_i;
 	c_i.method = (enum method_type) * test_vectors[vec_num_i].method;
@@ -200,6 +202,8 @@ int main()
 
 #ifdef T1_RFC9529
 	c_i.sock = &sockfd;
+	c_i.x_key_id = 0;
+	c_i.i_key_id = 0;
 	c_i.c_i.len = T1_RFC9529__C_I_LEN;
 	c_i.c_i.ptr = (uint8_t *)T1_RFC9529__C_I;
 	c_i.method = (enum method_type)T1_RFC9529__METHOD;

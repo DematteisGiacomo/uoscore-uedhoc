@@ -108,6 +108,8 @@ void test_edhoc_initiator_x509_x5t_rfc9529(void)
 					.len = sizeof(I_err_msg_buf) };
 
 	c_i.sock = NULL;
+	c_i.x_key_id = 0;
+	c_i.i_key_id = 0;
 	c_i.c_i.len = T1_RFC9529__C_I_LEN;
 	c_i.c_i.ptr = (uint8_t *)T1_RFC9529__C_I;
 	c_i.method = (enum method_type)T1_RFC9529__METHOD;
@@ -173,6 +175,8 @@ void test_edhoc_responder_x509_x5t_rfc9529(void)
 					.len = sizeof(R_err_msg_buf) };
 
 	c_r.sock = NULL;
+	c_r.y_key_id = 0;
+	c_r.r_key_id = 0;
 	c_r.c_r.ptr = (uint8_t *)T1_RFC9529__C_R;
 	c_r.c_r.len = T1_RFC9529__C_R_LEN;
 	c_r.suites_r.len = T1_RFC9529__SUITES_R_LEN;
