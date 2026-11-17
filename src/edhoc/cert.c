@@ -34,6 +34,7 @@
 #include <mbedtls/x509.h>
 #include <mbedtls/x509_crt.h>
 
+#if MBEDTLS_VERSION_MAJOR < 4
 struct deser_sign_ctx_s {
 	uint8_t *seek;
 	uint8_t *end;
@@ -73,6 +74,7 @@ static int find_pk_cb(void *void_ppk, int tag, unsigned char *start, size_t len)
 	}
 	return 0;
 }
+#endif /* MBEDTLS_VERSION_MAJOR < 4 */
 
 #define PSA_KEY_ALL_USAGES                                                     \
 	(PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_COPY | PSA_KEY_USAGE_ENCRYPT |   \
@@ -291,7 +293,15 @@ enum err cert_x509_verify(struct const_byte_array *cert,
 			  const struct cred_array *cred_array,
 			  struct byte_array *pk, bool *verified)
 {
-#ifdef MBEDTLS
+#if defined(MBEDTLS) && (MBEDTLS_VERSION_MAJOR >= 4)
+
+	(void)cert;
+	(void)cred_array;
+	(void)pk;
+	*verified = false;
+	return not_supported_feature;
+
+#elif defined(MBEDTLS)
 
 	PRINT_MSG("Start parsing an ASN.1 certificate\n");
 
