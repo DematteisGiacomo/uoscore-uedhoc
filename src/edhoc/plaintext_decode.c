@@ -45,12 +45,19 @@ static enum err id_cred_x_encode(enum id_cred_x_label label, int algo,
 
 	switch (label) {
 	case kid:
-		//todo update that to v15
 		map.id_cred_x_map_kid_present = true;
-		map.id_cred_x_map_kid.id_cred_x_map_kid_choice =
-			id_cred_x_map_kid_int_c;
-		map.id_cred_x_map_kid.id_cred_x_map_kid_int =
-			*((const int32_t *)id);
+		if (id_len == 0) {
+			map.id_cred_x_map_kid.id_cred_x_map_kid_choice =
+				id_cred_x_map_kid_int_c;
+			map.id_cred_x_map_kid.id_cred_x_map_kid_int =
+				*((const int32_t *)id);
+		} else {
+			map.id_cred_x_map_kid.id_cred_x_map_kid_choice =
+				id_cred_x_map_kid_bstr_c;
+			map.id_cred_x_map_kid.id_cred_x_map_kid_bstr.value = id;
+			map.id_cred_x_map_kid.id_cred_x_map_kid_bstr.len =
+				id_len;
+		}
 		break;
 	case x5chain:
 		map.id_cred_x_map_x5chain_present = true;
@@ -127,15 +134,15 @@ static enum err plaintext2_split(struct byte_array *ptxt,
 		/*Note that if ID_CRED_x contains a single 'kid' parameter,
             i.e., ID_CRED_R = { 4 : kid_x }, only the byte string kid_x
             is conveyed in the plaintext encoded as a bstr or int*/
-		if (p.ptxt2_ID_CRED_R_choice == ptxt2_ID_CRED_R_map2_m_c) {
+		if (p.ptxt2_ID_CRED_R_choice == ptxt2_ID_CRED_R_bstr_c) {
 			TRY(id_cred_x_encode(
 				kid, 0, p.ptxt2_ID_CRED_R_bstr.value,
 				(uint32_t)p.ptxt2_ID_CRED_R_bstr.len,
 				id_cred_r));
 
 		} else {
-			int _kid = p.ptxt2_ID_CRED_R_int;
-			TRY(id_cred_x_encode(kid, 0, &_kid, 1, id_cred_r));
+			int32_t _kid = p.ptxt2_ID_CRED_R_int;
+			TRY(id_cred_x_encode(kid, 0, &_kid, 0, id_cred_r));
 		}
 	}
 	TRY(_memcpy_s(sign_or_mac->ptr, sign_or_mac->len,
@@ -193,15 +200,15 @@ static enum err plaintext3_split(struct byte_array *ptxt,
 		/*Note that if ID_CRED_x contains a single 'kid' parameter,
             i.e., ID_CRED_I = { 4 : kid_x }, only the byte string kid_x
             is conveyed in the plaintext encoded as a bstr or int*/
-		if (p.ptxt3_ID_CRED_I_choice == ptxt3_ID_CRED_I_map3_m_c) {
+		if (p.ptxt3_ID_CRED_I_choice == ptxt3_ID_CRED_I_bstr_c) {
 			TRY(id_cred_x_encode(
 				kid, 0, p.ptxt3_ID_CRED_I_bstr.value,
 				(uint32_t)p.ptxt3_ID_CRED_I_bstr.len,
 				id_cred_i));
 
 		} else {
-			int _kid = p.ptxt3_ID_CRED_I_int;
-			TRY(id_cred_x_encode(kid, 0, &_kid, 1, id_cred_i));
+			int32_t _kid = p.ptxt3_ID_CRED_I_int;
+			TRY(id_cred_x_encode(kid, 0, &_kid, 0, id_cred_i));
 		}
 	}
 	TRY(_memcpy_s(sign_or_mac->ptr, sign_or_mac->len,

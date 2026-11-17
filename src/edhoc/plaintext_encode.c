@@ -15,6 +15,7 @@
 #include "edhoc/signature_or_mac_msg.h"
 #include "edhoc/plaintext.h"
 #include "edhoc/bstr_encode_decode.h"
+#include "edhoc/int_encode_decode.h"
 
 #include "common/oscore_edhoc_error.h"
 #include "common/memcpy_s.h"
@@ -32,7 +33,24 @@ enum err id_cred2kid(const struct byte_array *id_cred, struct byte_array *kid)
 					     &decode_len),
 		   0);
 
-	if (map.id_cred_x_map_kid_present) {
+	if (map.id_cred_x_map_kid_present &&
+	    (map.id_cred_x_map_kid.id_cred_x_map_kid_choice ==
+	     id_cred_x_map_kid_bstr_c)) {
+		/*RFC 9528, 3.5.3.2: a one byte kid that is a valid CBOR
+		  int encoding is conveyed as that int, otherwise as bstr*/
+		struct byte_array kid_value = BYTE_ARRAY_INIT(
+			(uint8_t *)map.id_cred_x_map_kid.id_cred_x_map_kid_bstr
+				.value,
+			(uint32_t)map.id_cred_x_map_kid.id_cred_x_map_kid_bstr
+				.len);
+
+		if (c_x_is_encoded_int(&kid_value)) {
+			TRY(_memcpy_s(kid->ptr, kid->len, kid_value.ptr, 1));
+			kid->len = 1;
+		} else {
+			TRY(encode_bstr(&kid_value, kid));
+		}
+	} else if (map.id_cred_x_map_kid_present) {
 		TRY_EXPECT(
 			cbor_encode_int_type_i(
 				kid->ptr, kid->len,
