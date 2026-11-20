@@ -29,8 +29,79 @@
 #include "common/print_util.h"
 #include "common/unit_test.h"
 
+#if defined(OSCORE_PSA_OPAQUE_KEYS) && !defined(MBEDTLS)
+#error "OSCORE_PSA_OPAQUE_KEYS requires MBEDTLS"
+#endif
+
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+/* AEAD algorithm the derived Sender/Recipient keys may be used with. */
+#define OSCORE_PSA_AEAD_ALG                                                    \
+	PSA_ALG_AEAD_WITH_SHORTENED_TAG(PSA_ALG_CCM, AUTH_TAG_LEN)
+
 /**
- * @brief       Common derive procedure used to derive the Common IV and 
+ * @brief       Builds the OSCORE HKDF info structure for a derivation.
+ * @param cc    pointer to the common context
+ * @param id    empty array for Common IV, sender / recipient ID for keys
+ * @param type  IV for Common IV, KEY for Sender / Recipient Keys
+ * @param info  out-array. Must be initialized
+ * @return      err
+ */
+static enum err build_hkdf_info(struct common_context *cc,
+				struct byte_array *id, enum derive_type type,
+				struct byte_array *info)
+{
+	if (cc->kdf != OSCORE_SHA_256) {
+		return oscore_unknown_hkdf;
+	}
+	TRY(oscore_create_hkdf_info(id, &cc->id_context, cc->aead_alg, type,
+				    info));
+	PRINT_ARRAY("info struct", info->ptr, info->len);
+	return ok;
+}
+
+/**
+ * @brief    Derives the Common IV (public, so kept as plain bytes).
+ */
+static enum err derive_common_iv(struct common_context *cc)
+{
+	BYTE_ARRAY_NEW(info, MAX_INFO_LEN, MAX_INFO_LEN);
+	TRY(build_hkdf_info(cc, &EMPTY_ARRAY, IV, &info));
+	TRY(oscore_derive_iv_bytes(cc->master_secret_id, &cc->master_salt,
+				   &info, &cc->common_iv));
+	PRINT_ARRAY("Common IV", cc->common_iv.ptr, cc->common_iv.len);
+	return ok;
+}
+
+/**
+ * @brief    Derives the Sender Key as an opaque volatile PSA key.
+ */
+static enum err derive_sender_key(struct common_context *cc,
+				  struct sender_context *sc)
+{
+	BYTE_ARRAY_NEW(info, MAX_INFO_LEN, MAX_INFO_LEN);
+	TRY(build_hkdf_info(cc, &sc->sender_id, KEY, &info));
+	TRY(oscore_derive_aead_key(cc->master_secret_id, &cc->master_salt,
+				   &info, PSA_BYTES_TO_BITS(SENDER_KEY_LEN_),
+				   OSCORE_PSA_AEAD_ALG, &sc->sender_key_id));
+	return ok;
+}
+
+/**
+ * @brief    Derives the Recipient Key as an opaque volatile PSA key.
+ */
+static enum err derive_recipient_key(struct common_context *cc,
+				     struct recipient_context *rc)
+{
+	BYTE_ARRAY_NEW(info, MAX_INFO_LEN, MAX_INFO_LEN);
+	TRY(build_hkdf_info(cc, &rc->recipient_id, KEY, &info));
+	TRY(oscore_derive_aead_key(cc->master_secret_id, &cc->master_salt,
+				   &info, PSA_BYTES_TO_BITS(RECIPIENT_KEY_LEN_),
+				   OSCORE_PSA_AEAD_ALG, &rc->recipient_key_id));
+	return ok;
+}
+#else /* !OSCORE_PSA_OPAQUE_KEYS */
+/**
+ * @brief       Common derive procedure used to derive the Common IV and
  *              Sender / Recipient Keys
  * @param cc    pointer to the common context
  * @param id    empty array for Common IV, sender / recipient ID for keys
@@ -60,7 +131,7 @@ STATIC enum err derive(struct common_context *cc, struct byte_array *id,
 }
 
 /**
- * @brief    Derives the Common IV 
+ * @brief    Derives the Common IV
  * @param    cc    pointer to the common context
  * @return   err
  */
@@ -72,7 +143,7 @@ static enum err derive_common_iv(struct common_context *cc)
 }
 
 /**
- * @brief    Derives the Sender Key 
+ * @brief    Derives the Sender Key
  * @param    cc    pointer to the common context
  * @param    sc    pointer to the sender context
  * @return   err
@@ -86,7 +157,7 @@ static enum err derive_sender_key(struct common_context *cc,
 }
 
 /**
- * @brief    Derives the Recipient Key 
+ * @brief    Derives the Recipient Key
  * @param    cc    pointer to the common context
  * @param    sc    pointer to the recipient context
  * @return   err
@@ -98,6 +169,66 @@ static enum err derive_recipient_key(struct common_context *cc,
 
 	PRINT_ARRAY("Recipient Key", rc->recipient_key.ptr,
 		    rc->recipient_key.len);
+	return ok;
+}
+#endif /* OSCORE_PSA_OPAQUE_KEYS */
+
+static enum err derive_contexts(struct oscore_init_params *params,
+				struct context *c)
+{
+	c->cc.common_iv.len = sizeof(c->cc.common_iv_buf);
+	c->cc.common_iv.ptr = c->cc.common_iv_buf;
+	TRY(derive_common_iv(&c->cc));
+
+	/*derive Recipient Context*********************************************/
+	c->rc.notification_num_initialized = false;
+	server_replay_window_init(&c->rc.replay_window);
+	c->rc.recipient_id.len = params->recipient_id.len;
+	c->rc.recipient_id.ptr = c->rc.recipient_id_buf;
+	memcpy(c->rc.recipient_id.ptr, params->recipient_id.ptr,
+	       params->recipient_id.len);
+#ifndef OSCORE_PSA_OPAQUE_KEYS
+	c->rc.recipient_key.len = sizeof(c->rc.recipient_key_buf);
+	c->rc.recipient_key.ptr = c->rc.recipient_key_buf;
+#endif
+	TRY(derive_recipient_key(&c->cc, &c->rc));
+
+	/*derive Sender Context************************************************/
+	c->sc.sender_id = params->sender_id;
+#ifndef OSCORE_PSA_OPAQUE_KEYS
+	c->sc.sender_key.len = sizeof(c->sc.sender_key_buf);
+	c->sc.sender_key.ptr = c->sc.sender_key_buf;
+#endif
+	struct nvm_key_t nvm_key = { .sender_id = c->sc.sender_id,
+				     .recipient_id = c->rc.recipient_id,
+				     .id_context = c->cc.id_context };
+
+	TRY(ssn_init(&nvm_key, &c->sc.ssn, params->fresh_master_secret_salt));
+	TRY(derive_sender_key(&c->cc, &c->sc));
+
+	return ok;
+}
+
+enum err oscore_context_deinit(struct context *c)
+{
+	if (NULL == c) {
+		return wrong_parameter;
+	}
+
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	if (PSA_KEY_ID_NULL != c->sc.sender_key_id) {
+		psa_destroy_key(c->sc.sender_key_id);
+		c->sc.sender_key_id = PSA_KEY_ID_NULL;
+	}
+	if (PSA_KEY_ID_NULL != c->rc.recipient_key_id) {
+		psa_destroy_key(c->rc.recipient_key_id);
+		c->rc.recipient_key_id = PSA_KEY_ID_NULL;
+	}
+	c->cc.master_secret_id = PSA_KEY_ID_NULL;
+#else
+	memset(c->sc.sender_key_buf, 0, sizeof(c->sc.sender_key_buf));
+	memset(c->rc.recipient_key_buf, 0, sizeof(c->rc.recipient_key_buf));
+#endif
 	return ok;
 }
 
@@ -119,35 +250,49 @@ enum err oscore_context_init(struct oscore_init_params *params,
 		c->cc.kdf = OSCORE_SHA_256; /*that's the default*/
 	}
 
-        c->cc.fresh_master_secret_salt = params->fresh_master_secret_salt;
-	c->cc.master_secret = params->master_secret;
+	c->cc.fresh_master_secret_salt = params->fresh_master_secret_salt;
 	c->cc.master_salt = params->master_salt;
 	c->cc.id_context = params->id_context;
-	c->cc.common_iv.len = sizeof(c->cc.common_iv_buf);
-	c->cc.common_iv.ptr = c->cc.common_iv_buf;
-	TRY(derive_common_iv(&c->cc));
 
-	/*derive Recipient Context*********************************************/
-	c->rc.notification_num_initialized = false;
-	server_replay_window_init(&c->rc.replay_window);
-	c->rc.recipient_id.len = params->recipient_id.len;
-	c->rc.recipient_id.ptr = c->rc.recipient_id_buf;
-	memcpy(c->rc.recipient_id.ptr, params->recipient_id.ptr,
-	       params->recipient_id.len);
-	c->rc.recipient_key.len = sizeof(c->rc.recipient_key_buf);
-	c->rc.recipient_key.ptr = c->rc.recipient_key_buf;
-	TRY(derive_recipient_key(&c->cc, &c->rc));
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	/* If the caller supplied a master secret key ID, use it (the caller owns
+	   its lifetime). Otherwise import the raw bytes into a temporary volatile
+	   derive key that is destroyed once the derivation is done. */
+	bool owns_master_key = false;
+	psa_key_id_t master_secret_id = params->master_secret_id;
 
-	/*derive Sender Context************************************************/
-	c->sc.sender_id = params->sender_id;
-	c->sc.sender_key.len = sizeof(c->sc.sender_key_buf);
-	c->sc.sender_key.ptr = c->sc.sender_key_buf;
-	struct nvm_key_t nvm_key = { .sender_id = c->sc.sender_id,
-				     .recipient_id = c->rc.recipient_id,
-				     .id_context = c->cc.id_context };
+	c->sc.sender_key_id = PSA_KEY_ID_NULL;
+	c->rc.recipient_key_id = PSA_KEY_ID_NULL;
 
-	TRY(ssn_init(&nvm_key, &c->sc.ssn, params->fresh_master_secret_salt));
-	TRY(derive_sender_key(&c->cc, &c->sc));
+	TRY_EXPECT(psa_crypto_init(), PSA_SUCCESS);
+	if (PSA_KEY_ID_NULL == master_secret_id) {
+		psa_key_attributes_t ms_attr = PSA_KEY_ATTRIBUTES_INIT;
+		psa_set_key_usage_flags(&ms_attr, PSA_KEY_USAGE_DERIVE);
+		psa_set_key_algorithm(&ms_attr, PSA_ALG_HKDF(PSA_ALG_SHA_256));
+		psa_set_key_type(&ms_attr, PSA_KEY_TYPE_DERIVE);
+		psa_set_key_lifetime(&ms_attr, PSA_KEY_LIFETIME_VOLATILE);
+		TRY_EXPECT(psa_import_key(&ms_attr, params->master_secret.ptr,
+					  params->master_secret.len,
+					  &master_secret_id),
+			   PSA_SUCCESS);
+		owns_master_key = true;
+	}
+	c->cc.master_secret_id = master_secret_id;
+
+	enum err r = derive_contexts(params, c);
+
+	if (owns_master_key) {
+		psa_destroy_key(master_secret_id);
+		c->cc.master_secret_id = PSA_KEY_ID_NULL;
+	}
+	if (ok != r) {
+		oscore_context_deinit(c);
+		return r;
+	}
+#else
+	c->cc.master_secret = params->master_secret;
+	TRY(derive_contexts(params, c));
+#endif
 
 	/*set up the request response context**********************************/
 	oscore_interactions_init(c->rrc.interactions);

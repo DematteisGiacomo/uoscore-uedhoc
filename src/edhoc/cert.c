@@ -9,6 +9,10 @@
    except according to those terms.
 */
 
+#ifdef MBEDTLS
+#define MBEDTLS_ALLOW_PRIVATE_ACCESS
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -24,8 +28,6 @@
 #include "cbor/edhoc_decode_cert.h"
 
 #ifdef MBEDTLS
-#define MBEDTLS_ALLOW_PRIVATE_ACCESS
-
 #include <psa/crypto.h>
 #include <mbedtls/asn1.h>
 #include <mbedtls/error.h>

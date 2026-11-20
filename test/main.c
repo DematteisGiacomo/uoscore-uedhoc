@@ -65,6 +65,8 @@
 #define TEST_EDHOC_INITIATOR_EMPTY_C_R 49
 #define TEST_EDHOC_RESPONDER_EMPTY_C_R 50
 #define T_RETRIEVE_CRED_UNCOMPRESSED_G 51
+#define T12_OSCORE_MASTER_SECRET_KEY_ID 52
+#define T505_OSCORE_CONTEXT_DEINIT 53
 
 // if this macro is defined all tests will be executed
  #define EXECUTE_ALL_TESTS
@@ -116,6 +118,13 @@ ZTEST(uoscore_uedhoc, t1_oscore)
 	skip(T1_OSCORE_CLIENT_REQUEST_RESPONSE,
 	     t1_oscore_client_request_response);
 }
+
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+ZTEST(uoscore_uedhoc, t12_oscore)
+{
+	skip(T12_OSCORE_MASTER_SECRET_KEY_ID, t12_oscore_master_secret_key_id);
+}
+#endif
 
 ZTEST(uoscore_uedhoc, t2_oscore)
 {
@@ -276,6 +285,11 @@ ZTEST(uoscore_uedhoc, t502_oscore)
 ZTEST(uoscore_uedhoc, t503_oscore)
 {
 	skip(T503_DERIVE_CORNER_CASE, t503_derive_corner_case);
+}
+
+ZTEST(uoscore_uedhoc, t505_oscore)
+{
+	skip(T505_OSCORE_CONTEXT_DEINIT, t505_oscore_context_deinit);
 }
 
 ZTEST(uoscore_uedhoc, t600_oscore)

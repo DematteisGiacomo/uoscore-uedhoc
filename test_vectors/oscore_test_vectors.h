@@ -80,6 +80,7 @@ extern uint8_t T4__MASTER_SALT_LEN;
 extern const uint8_t *T4__ID_CONTEXT;
 extern uint8_t T4__ID_CONTEXT_LEN;
 extern const uint8_t T4__SENDER_KEY[];
+extern uint8_t T4__SENDER_KEY_LEN;
 extern const uint8_t T4__RECIPIENT_KEY[];
 extern uint8_t T4__RECIPIENT_KEY_LEN;
 extern const uint8_t T4__COMMON_IV[];
