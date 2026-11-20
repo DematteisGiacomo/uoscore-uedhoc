@@ -152,6 +152,8 @@ int internal_main(void)
 	start_coap_server(&sockfd);
 
 	c_r.sock = &sockfd;
+	c_r.y_key_id = 0;
+	c_r.r_key_id = 0;
 	c_r.c_r.ptr = (uint8_t *)test_vectors[vec_num_i].c_r;
 	c_r.c_r.len = test_vectors[vec_num_i].c_r_len;
 	c_r.suites_r.len = test_vectors[vec_num_i].SUITES_R_len;
