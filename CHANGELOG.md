@@ -18,6 +18,16 @@ version tags.
   OSCORE IDs from it.
 - **Cipher suites:** the responder now rejects suites that aren't in
   `suites_r`.
+- **EDHOC contexts:** `struct edhoc_initiator_context` has new
+  `x_key_id`/`i_key_id` fields and `struct edhoc_responder_context` has new
+  `y_key_id`/`r_key_id` fields. Set them to 0 (or zero-initialize the
+  context) to keep using the raw private keys.
+
+### Added
+
+- edhoc: the private ECDH keys (X, Y, I, R) can be given as PSA key IDs, so
+  they never leave the PSA key store (Mbed TLS only). New
+  `ephemeral_dh_key_gen_psa()` generates the ephemeral key pair in PSA.
 
 ### Fixed
 - EDHOC: a static DH public key given as an uncompressed P-256 point (65
