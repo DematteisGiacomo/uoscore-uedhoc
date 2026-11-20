@@ -66,8 +66,20 @@
  * small set of input parameters.
  */
 struct oscore_init_params {
-	/*master_secret must be provided. Currently 16 byte secrets are supported*/
+	/*master_secret must be provided. Currently 16 byte secrets are supported.
+	  With OSCORE_PSA_OPAQUE_KEYS it may be left empty if master_secret_id
+	  is set.*/
 	const struct byte_array master_secret;
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	/* Optional opaque PSA key holding the master secret (PSA_KEY_TYPE_DERIVE,
+	   HKDF-SHA-256, usage DERIVE). When set (!= PSA_KEY_ID_NULL) the raw
+	   master_secret bytes are ignored and all key derivation happens inside
+	   the secure domain. When PSA_KEY_ID_NULL (e.g. the EDHOC path), the
+	   master_secret bytes are imported into a temporary volatile derive key.
+	   Note: leaving this field unset in a designated initializer yields
+	   PSA_KEY_ID_NULL (0), preserving legacy/EDHOC behaviour. */
+	const psa_key_id_t master_secret_id;
+#endif
 	/*sender_id must be provided*/
 	const struct byte_array sender_id;
 	/*recipient_id must be provided*/
@@ -97,6 +109,17 @@ struct oscore_init_params {
  */
 enum err oscore_context_init(struct oscore_init_params *params,
 			     struct context *c);
+
+/**
+ * @brief Release the keys held by a security context. With
+ * OSCORE_PSA_OPAQUE_KEYS the derived Sender/Recipient keys are destroyed,
+ * otherwise the key buffers are zeroed. A master secret key ID passed in
+ * oscore_init_params is owned by the caller and is not destroyed.
+ *
+ * @param	c the context to release
+ * @return  err
+ */
+enum err oscore_context_deinit(struct context *c);
 
 /**
  * @brief  	Checks if the packet in buf_in is a OSCORE packet.

@@ -30,3 +30,11 @@ west build -t run
 rm -rf build
 west build -b native_sim -- -DCOMMAND_LINE_FLAGS="-DASAN " -DCONFIG_ASAN=y
 west build -t run
+
+# SANITIZER:    YES
+# MESSAGE_4:    No
+# VLA:          No
+# PSA KEYS:     YES
+rm -rf build
+west build -b native_sim -- -DCOMMAND_LINE_FLAGS="-DASAN -DOSCORE_PSA_OPAQUE_KEYS" -DCONFIG_ASAN=y
+west build -t run

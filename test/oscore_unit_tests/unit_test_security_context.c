@@ -128,6 +128,9 @@ void t502_ssn2piv(void)
 */
 void t503_derive_corner_case(void)
 {
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	ztest_test_skip();
+#else
 	enum err r;
 	struct common_context cc;
 
@@ -145,6 +148,7 @@ void t503_derive_corner_case(void)
 
 	r = derive(&cc, &id, KEY, &out);
 	zassert_equal(r, oscore_unknown_hkdf, "Error in derive. r: %d", r);
+#endif
 }
 
 /**
@@ -167,4 +171,63 @@ void t504_context_freshness(void)
 	security_context.sc.ssn = OSCORE_SSN_OVERFLOW_VALUE;
 	result = check_context_freshness(&security_context);
 	zassert_equal(result, oscore_ssn_overflow, "");
+}
+
+void t505_oscore_context_deinit(void)
+{
+	enum err r;
+	struct context c;
+	uint8_t master_secret[16] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+				      0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
+				      0x0d, 0x0e, 0x0f, 0x10 };
+	uint8_t sender_id[] = { 0x01 };
+	uint8_t recipient_id[] = { 0x02 };
+	struct oscore_init_params params = {
+		.master_secret.ptr = master_secret,
+		.master_secret.len = sizeof(master_secret),
+		.sender_id.ptr = sender_id,
+		.sender_id.len = sizeof(sender_id),
+		.recipient_id.ptr = recipient_id,
+		.recipient_id.len = sizeof(recipient_id),
+		.aead_alg = OSCORE_AES_CCM_16_64_128,
+		.hkdf = OSCORE_SHA_256,
+		.fresh_master_secret_salt = true,
+	};
+
+	r = oscore_context_deinit(NULL);
+	zassert_equal(r, wrong_parameter, "Error in oscore_context_deinit");
+
+	r = oscore_context_init(&params, &c);
+	zassert_equal(r, ok, "Error in oscore_context_init");
+
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
+	psa_key_id_t sender_key_id = c.sc.sender_key_id;
+	psa_key_id_t recipient_key_id = c.rc.recipient_key_id;
+
+	zassert_equal(c.cc.master_secret_id, PSA_KEY_ID_NULL,
+		      "temporary master secret key not released");
+	zassert_not_equal(sender_key_id, PSA_KEY_ID_NULL, "no sender key");
+	zassert_not_equal(recipient_key_id, PSA_KEY_ID_NULL,
+			  "no recipient key");
+#endif
+
+	r = oscore_context_deinit(&c);
+	zassert_equal(r, ok, "Error in oscore_context_deinit");
+
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	zassert_equal(c.sc.sender_key_id, PSA_KEY_ID_NULL, "");
+	zassert_equal(c.rc.recipient_key_id, PSA_KEY_ID_NULL, "");
+	zassert_equal(psa_get_key_attributes(sender_key_id, &attr),
+		      PSA_ERROR_INVALID_HANDLE, "sender key not destroyed");
+	psa_reset_key_attributes(&attr);
+	zassert_equal(psa_get_key_attributes(recipient_key_id, &attr),
+		      PSA_ERROR_INVALID_HANDLE, "recipient key not destroyed");
+	psa_reset_key_attributes(&attr);
+#else
+	uint8_t zeros[SENDER_KEY_LEN_] = { 0 };
+
+	zassert_mem_equal(c.sc.sender_key_buf, zeros, sizeof(zeros), "");
+	zassert_mem_equal(c.rc.recipient_key_buf, zeros, sizeof(zeros), "");
+#endif
 }

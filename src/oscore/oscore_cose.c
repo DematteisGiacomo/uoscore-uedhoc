@@ -61,8 +61,7 @@ static enum err create_enc_structure(struct byte_array *external_aad,
 enum err oscore_cose_decrypt(struct byte_array *in_ciphertext,
 			     struct byte_array *out_plaintext,
 			     struct byte_array *nonce,
-			     struct byte_array *recipient_aad,
-			     struct byte_array *key)
+			     struct byte_array *recipient_aad, oscore_key_t key)
 {
 	/* get enc_structure */
 	uint32_t aad_len = recipient_aad->len + ENCRYPT0_ENCODING_OVERHEAD;
@@ -74,8 +73,13 @@ enum err oscore_cose_decrypt(struct byte_array *in_ciphertext,
 
 	PRINT_ARRAY("Ciphertext", in_ciphertext->ptr, in_ciphertext->len);
 
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	TRY(aead_with_key_id(DECRYPT, in_ciphertext, key, nonce, &aad,
+			     out_plaintext, &tag));
+#else
 	TRY(aead(DECRYPT, in_ciphertext, key, nonce, &aad, out_plaintext,
 		 &tag));
+#endif
 
 	PRINT_ARRAY("Decrypted plaintext", out_plaintext->ptr,
 		    out_plaintext->len);
@@ -85,8 +89,7 @@ enum err oscore_cose_decrypt(struct byte_array *in_ciphertext,
 enum err oscore_cose_encrypt(struct byte_array *in_plaintext,
 			     struct byte_array *out_ciphertext,
 			     struct byte_array *nonce,
-			     struct byte_array *sender_aad,
-			     struct byte_array *key)
+			     struct byte_array *sender_aad, oscore_key_t key)
 {
 	/* get enc_structure  */
 	uint32_t aad_len = sender_aad->len + ENCRYPT0_ENCODING_OVERHEAD;
@@ -99,8 +102,13 @@ enum err oscore_cose_encrypt(struct byte_array *in_plaintext,
 		BYTE_ARRAY_INIT(out_ciphertext->ptr + in_plaintext->len, 8);
 
 	out_ciphertext->len -= tag.len;
+#ifdef OSCORE_PSA_OPAQUE_KEYS
+	TRY(aead_with_key_id(ENCRYPT, in_plaintext, key, nonce, &aad,
+			     out_ciphertext, &tag));
+#else
 	TRY(aead(ENCRYPT, in_plaintext, key, nonce, &aad, out_ciphertext,
 		 &tag));
+#endif
 
 	PRINT_ARRAY("tag", tag.ptr, tag.len);
 	PRINT_ARRAY("Ciphertext", out_ciphertext->ptr, out_ciphertext->len);

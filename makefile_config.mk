@@ -48,6 +48,10 @@ CBOR_ENGINE += -DZCBOR
 # Uncomment to enable Non-volatile memory (NVM) support for storing security context between device reboots
 OSCORE_NVM_SUPPORT += -DOSCORE_NVM_SUPPORT
 
+# Uncomment to keep the OSCORE master secret and the derived Sender/Recipient keys as PSA key IDs (requires MBEDTLS with PSA HKDF support)
+# The application must be compiled with the same define, since it changes the layout of struct context and struct oscore_init_params
+#OSCORE_PSA_OPAQUE_KEYS += -DOSCORE_PSA_OPAQUE_KEYS
+
 ################################################################################
 # RAM optimization
 ################################################################################

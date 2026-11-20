@@ -49,8 +49,10 @@ enum err oscore_option_generate(struct byte_array *piv, struct byte_array *kid,
 				struct byte_array *kid_context,
 				struct oscore_option *oscore_option);
 
+#ifndef OSCORE_PSA_OPAQUE_KEYS
 enum err derive(struct common_context *cc, struct byte_array *id,
 		enum derive_type type, struct byte_array *out);
+#endif
 
 #else
 #define STATIC static

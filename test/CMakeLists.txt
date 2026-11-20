@@ -9,6 +9,10 @@ if(COMMAND_LINE_FLAGS MATCHES "ASAN")
 target_compile_options(app PRIVATE -fsanitize=address -fomit-frame-pointer)
 endif()
 
+if(COMMAND_LINE_FLAGS MATCHES "OSCORE_PSA_OPAQUE_KEYS")
+add_definitions(-DOSCORE_PSA_OPAQUE_KEYS)
+endif()
+
 FILE(GLOB app_sources
   *.c
   edhoc_integration_tests/*.c
