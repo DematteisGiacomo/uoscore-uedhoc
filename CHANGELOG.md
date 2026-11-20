@@ -48,6 +48,9 @@ version tags.
 - edhoc: add length checks to the built-in X.509 parser ([#87]).
 - edhoc: the responder checks that it supports the selected cipher suite
   ([#87]).
+- edhoc: the X.509 verification builds with Mbed TLS 4.x. With
+  `DEBUG_PRINT`, the certificate issuer is printed with
+  `mbedtls_x509_dn_gets()`.
 
 ## [3.2.0] - 2026-10-21
 
