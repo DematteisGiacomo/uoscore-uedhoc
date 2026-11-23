@@ -73,6 +73,23 @@ enum err shared_secret_derive(enum ecdh_alg alg, const struct byte_array *sk,
 			      uint8_t *shared_secret);
 
 /**
+ * @brief			Derives ECDH shared secret from a raw private
+ *				key or, when sk_id is not 0, from a PSA key.
+ *				PSA keys are supported with MBEDTLS only.
+ *
+ * @param alg			The ECDH algorithm to be used.
+ * @param[in] sk 		Private key, ignored when sk_id is not 0.
+ * @param sk_id 		PSA key ID of the private key or 0.
+ * @param[in] pk 		Public key.
+ * @param[out] shared_secret 	The result.
+ * @return 			Ok or error code.
+ */
+enum err shared_secret_derive_key(enum ecdh_alg alg,
+				  const struct byte_array *sk, uint32_t sk_id,
+				  const struct byte_array *pk,
+				  uint8_t *shared_secret);
+
+/**
  * @brief			HKDF extract function, see rfc5869.
  * 
  * @param alg			Hash algorithm to be used.

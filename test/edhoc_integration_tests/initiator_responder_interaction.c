@@ -160,6 +160,8 @@ void thread_initiator(void *vec_num, void *dummy2, void *dummy3)
 	struct edhoc_initiator_context c_i;
 
 	c_i.sock = NULL;
+	c_i.x_key_id = 0;
+	c_i.i_key_id = 0;
 	c_i.c_i.len = test_vectors[vec_num_i].c_i_len;
 	c_i.c_i.ptr = (uint8_t *)test_vectors[vec_num_i].c_i;
 	c_i.method = (enum method_type) * test_vectors[vec_num_i].method;
@@ -260,6 +262,8 @@ void thread_responder(void *vec_num, void *dummy2, void *dummy3)
 	struct edhoc_responder_context c_r;
 
 	c_r.sock = NULL;
+	c_r.y_key_id = 0;
+	c_r.r_key_id = 0;
 	c_r.c_r.ptr = (uint8_t *)test_vectors[vec_num_i].c_r;
 	c_r.c_r.len = test_vectors[vec_num_i].c_r_len;
 	c_r.suites_r.len = test_vectors[vec_num_i].SUITES_R_len;

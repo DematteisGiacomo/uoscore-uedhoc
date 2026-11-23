@@ -188,6 +188,8 @@ int main()
 	uint8_t vec_num_i = TEST_VEC_NUM - 1;
 
 	c_r.sock = &sockfd;
+	c_r.y_key_id = 0;
+	c_r.r_key_id = 0;
 	c_r.c_r.ptr = (uint8_t *)test_vectors[vec_num_i].c_r;
 	c_r.c_r.len = test_vectors[vec_num_i].c_r_len;
 	c_r.suites_r.len = test_vectors[vec_num_i].SUITES_R_len;
@@ -229,6 +231,8 @@ int main()
 
 #ifdef T1_RFC9529
 	c_r.sock = &sockfd;
+	c_r.y_key_id = 0;
+	c_r.r_key_id = 0;
 	c_r.c_r.len = T1_RFC9529__C_R_LEN;
 	c_r.c_r.ptr = (uint8_t *)T1_RFC9529__C_R;
 	c_r.suites_r.len = T1_RFC9529__SUITES_R_LEN;
